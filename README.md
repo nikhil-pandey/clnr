@@ -12,13 +12,15 @@ Deletes are **permanent**. Everything about clnr is built around never deleting 
 
 ## Install
 
-From source (Rust 1.100+):
+On macOS (Apple silicon or Intel) or Linux (x86-64 or arm64, any distribution), install the latest release into
+`~/.local/bin`:
 
 ```sh
-cargo install --path crates/clnr
+curl -fsSL https://raw.githubusercontent.com/nikhil-pandey/clnr/main/install.sh | sh
 ```
 
-Or with Bazel: `bazel build -c opt //:clnr`, then copy `bazel-bin/crates/clnr/clnr` onto your `PATH`.
+Or from source (Rust 1.100+): `cargo install --path crates/clnr`, or `bazel build --config=release //:clnr`
+and copy `bazel-bin/crates/clnr/clnr` onto your `PATH`.
 
 ## Use
 

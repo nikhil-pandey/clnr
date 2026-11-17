@@ -3,6 +3,7 @@ load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 exports_files([
     "LICENSE",
     "README.md",
+    "install.sh",
 ])
 
 # Cargo.toml owns the version, dependencies, and lint levels for both build systems. The version reaches rustc as
