@@ -2,7 +2,8 @@ name: CI
 
 # Pull requests run Bazel on Linux: tests, clippy, and rustfmt on every Rust target, and a read-only smoke
 # run. Linux also cross-builds and lints everything for macOS; the macOS runner runs that build's tests and smoke run
-# without a toolchain of its own. Pull requests write Bazel's action outputs and test results to BuildBuddy; a weekly run
+# without a toolchain of its own. The release build runs too, and each archive is unpacked and run on the OS and
+# architecture it targets. Pull requests write Bazel's action outputs and test results to BuildBuddy; a weekly run
 # on main only refreshes the GitHub caches of downloads that pull requests restore (GitHub scopes a pull request's caches
 # to that pull request).
 on:
@@ -21,7 +22,7 @@ permissions:
 
 jobs:
   bazel:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,7 +46,7 @@ jobs:
           bazel run --config=ci //:clnr -- config check
 
   cross:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,7 +75,7 @@ jobs:
 
   macos:
     needs: cross
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -98,3 +99,35 @@ jobs:
           ./clnr providers --root "$RUNNER_TEMP"
           ./clnr list --root "$RUNNER_TEMP"
           ./clnr config check
+
+  # The release build, exactly as the release workflow runs it, without publishing.
+  dist:
+    uses: ./.github/workflows/dist.yml
+    secrets:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+
+  # Unpacks each release archive on the OS and architecture it targets and runs it, read-only.
+  smoke:
+    name: smoke (${{ matrix.target }})
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: dist
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-26.04, target: x86_64-unknown-linux-musl }
+          - { os: ubuntu-26.04-arm, target: aarch64-unknown-linux-musl }
+          - { os: macos-26, target: aarch64-apple-darwin }
+          - { os: macos-26-intel, target: x86_64-apple-darwin }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - run: |
+          tar -xzf "dist/clnr-${{ matrix.target }}.tar.gz"
+          bin="clnr-${{ matrix.target }}/clnr"
+          "$bin" --version
+          "$bin" providers --root "$RUNNER_TEMP"
+          "$bin" config check

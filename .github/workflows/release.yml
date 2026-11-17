@@ -1,8 +1,15 @@
 name: Release
 
-# release-plz keeps a release PR open with the next version and changelog. Merging it tags `v<version>`, and Bazel
-# cross-builds the archives, which are published with the install script to that tag's GitHub release.
+# release-plz keeps a release PR open with the next version and changelog. Merging it tags `v<version>`, and the
+# shared dist workflow publishes the Bazel-built archives and install script to that tag's GitHub release.
+# Dispatching it with a `tag` publishes that existing tag again, for example after a failed publish.
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish; leave empty to prepare a release
+        type: string
+        default: ''
   push:
     branches: [main]
 
@@ -18,8 +25,8 @@ env:
 
 jobs:
   pr:
-    if: github.repository_owner == 'nikhil-pandey'
-    runs-on: ubuntu-latest
+    if: github.repository_owner == 'nikhil-pandey' && !inputs.tag
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       pull-requests: write
@@ -38,8 +45,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   tag:
-    if: github.repository_owner == 'nikhil-pandey'
-    runs-on: ubuntu-latest
+    if: github.repository_owner == 'nikhil-pandey' && !inputs.tag
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       pull-requests: read
@@ -66,26 +73,14 @@ jobs:
 
   publish:
     needs: tag
-    if: needs.tag.outputs.tag != ''
-    runs-on: ubuntu-latest
+    if: >-
+      !cancelled() && github.repository_owner == 'nikhil-pandey' &&
+      (needs.tag.outputs.tag != '' || inputs.tag != '')
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.tag.outputs.tag }}
-          persist-credentials: false
-      - uses: bazel-contrib/setup-bazel@f34d6a05eae3c24acab7fa54587492daeaeffdab # 0.19.2
-        with:
-          bazelisk-cache: true
-          external-cache: true
-          repository-cache: true
-          # Action outputs go through BuildBuddy (.bazelrc).
-          bazelrc: |
-            ${{ secrets.BUILDBUDDY_API_KEY && format('common --remote_header=x-buildbuddy-api-key={0}', secrets.BUILDBUDDY_API_KEY) || '' }}
-      # Cross-builds every target from this runner; see packaging/BUILD.bazel.
-      - run: bazel build --config=ci --config=release //packaging:dist
-      - run: gh release create "$TAG" bazel-bin/packaging/dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$TAG"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.tag.outputs.tag }}
+    uses: ./.github/workflows/dist.yml
+    secrets:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    with:
+      ref: ${{ inputs.tag || needs.tag.outputs.tag }}
+      publish: true

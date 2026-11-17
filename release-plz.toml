@@ -8,7 +8,6 @@ git_tag_enable = false
 release_always = false
 semver_check = false
 changelog_update = false
-pr_branch_prefix = "pandeyn/agent/release-plz-"
 
 [[package]]
 name = "clnr"
