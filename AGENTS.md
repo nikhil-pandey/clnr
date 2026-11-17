@@ -18,7 +18,10 @@ than anything else here.
 - `cargo run -p clnr -- <args>` for quick local runs.
 - Dependencies are added with `cargo add`; Bazel picks them up through rules_rs `crate.from_cargo` (`MODULE.bazel.lock`
   updates on the next build). New non-Rust files read at compile time need `compile_data` in `BUILD.bazel`.
-- Releases: `bazel build --config=release //packaging:dist` cross-builds every target from any host.
+- Releases: release-plz keeps a release PR open; merging it tags `v<version>`, and `release.yml` publishes
+  `bazel build --config=release //packaging:dist`, which cross-builds every target from any host, with `install.sh`.
+  Use Conventional Commit titles (`feat:`, `fix:`); squash merges use the PR title.
+- Bazel shares action outputs through BuildBuddy (`.bazelrc`); CI authenticates with the `BUILDBUDDY_API_KEY` secret.
 
 ## Rules for providers
 

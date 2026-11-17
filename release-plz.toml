@@ -1,0 +1,31 @@
+# Release PRs bump the shared version and CHANGELOG.md. Merging one tags `v<version>`; the release workflow then
+# publishes the Bazel-built archives. Versions come from git tags, and nothing is published to crates.io.
+[workspace]
+git_only = true
+git_release_enable = false
+git_tag_name = "v{{ version }}"
+git_tag_enable = false
+release_always = false
+semver_check = false
+changelog_update = false
+pr_branch_prefix = "pandeyn/agent/release-plz-"
+
+[[package]]
+name = "clnr"
+git_tag_enable = true
+changelog_update = true
+changelog_path = "CHANGELOG.md"
+changelog_include = ["clnr-core", "clnr-providers", "clnr-tui"]
+version_group = "clnr"
+
+[[package]]
+name = "clnr-core"
+version_group = "clnr"
+
+[[package]]
+name = "clnr-providers"
+version_group = "clnr"
+
+[[package]]
+name = "clnr-tui"
+version_group = "clnr"

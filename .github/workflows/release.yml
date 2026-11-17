@@ -1,31 +1,91 @@
 name: Release
 
+# release-plz keeps a release PR open with the next version and changelog. Merging it tags `v<version>`, and Bazel
+# cross-builds the archives, which are published with the install script to that tag's GitHub release.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # renovate: datasource=github-releases depName=release-plz/release-plz extractVersion=^release-plz-v(?<version>.*)$
+  RELEASE_PLZ_VERSION: 0.4.3
 
 jobs:
-  release:
+  pr:
+    if: github.repository_owner == 'nikhil-pandey'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # release-plz drives Cargo to update versions, Cargo.lock, and the changelog.
+      - run: rustup toolchain install
+      - uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5.148
+        with:
+          command: release-pr
+          version: ${{ env.RELEASE_PLZ_VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tag:
+    if: github.repository_owner == 'nikhil-pandey'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup toolchain install
+      - id: release
+        uses: release-plz/action@66b324fd6c72d05d2a08568492ecdd62bfb8a62b # v0.5.148
+        with:
+          command: release
+          version: ${{ env.RELEASE_PLZ_VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: tag
+        if: steps.release.outputs.releases_created == 'true'
+        run: echo "tag=$(jq -r '.[0].tag' <<< "$RELEASES")" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASES: ${{ steps.release.outputs.releases }}
+
+  publish:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.tag.outputs.tag }}
           persist-credentials: false
       - uses: bazel-contrib/setup-bazel@f34d6a05eae3c24acab7fa54587492daeaeffdab # 0.19.2
         with:
           bazelisk-cache: true
-          disk-cache: dist
           external-cache: true
           repository-cache: true
+          # Action outputs go through BuildBuddy (.bazelrc).
+          bazelrc: |
+            ${{ secrets.BUILDBUDDY_API_KEY && format('common --remote_header=x-buildbuddy-api-key={0}', secrets.BUILDBUDDY_API_KEY) || '' }}
       # Cross-builds every target from this runner; see packaging/BUILD.bazel.
       - run: bazel build --config=ci --config=release //packaging:dist
-      - name: Publish
+      - run: gh release create "$TAG" bazel-bin/packaging/dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$TAG"
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" bazel-bin/packaging/dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.tag.outputs.tag }}

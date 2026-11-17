@@ -34,12 +34,14 @@ crate.from_cargo(
     generate_lint_config = True,
     incompatible_no_root_alias_targets = True,
     incompatible_no_root_crate_data = True,
-    # Linux and macOS hosts, which are also the release targets.
+    # Linux and macOS hosts, plus the static Linux release targets.
     platform_triples = [
         "aarch64-apple-darwin",
         "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
         "x86_64-apple-darwin",
         "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
     ],
 )
 use_repo(crate, "crates")

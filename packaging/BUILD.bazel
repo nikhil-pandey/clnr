@@ -7,13 +7,15 @@ load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 #
 #   bazel build --config=release //packaging:dist
 #
-# bazel-bin/packaging/dist then holds one archive per target and SHA256SUMS. Asset names carry no version so that
+# bazel-bin/packaging/dist then holds one archive per target, the install script, and SHA256SUMS. Asset names carry no version so that
 # `releases/latest/download/...` URLs stay stable.
 
+# Linux binaries are static (musl), so they run on any distribution.
 TARGETS = [
     "aarch64-apple-darwin",
-    "aarch64-unknown-linux-gnu",
-    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-musl",
 ]
 
 pkg_files(
@@ -60,11 +62,11 @@ pkg_files(
     for triple in TARGETS
 ]
 
-ARCHIVES = [":{}_archive".format(triple) for triple in TARGETS]
+ASSETS = [":{}_archive".format(triple) for triple in TARGETS] + ["//:install.sh"]
 
 genrule(
     name = "checksums",
-    srcs = ARCHIVES,
+    srcs = ASSETS,
     outs = ["SHA256SUMS"],
     cmd = " ".join([
         "coreutils=$$PWD/$(COREUTILS_BIN);",
@@ -76,7 +78,10 @@ genrule(
 
 copy_to_directory(
     name = "dist",
-    srcs = ARCHIVES + [":checksums"],
-    root_paths = ["packaging"],
+    srcs = ASSETS + [":checksums"],
+    root_paths = [
+        ".",
+        "packaging",
+    ],
     tags = ["manual"],
 )
