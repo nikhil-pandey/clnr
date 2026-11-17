@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.100"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+clnr-core = { path = "crates/clnr-core" }
+clnr-providers = { path = "crates/clnr-providers" }
+clnr-tui = { path = "crates/clnr-tui" }

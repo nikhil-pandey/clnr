@@ -1,0 +1,22 @@
+load("@crates//clnr-tui:data.bzl", "all_crate_deps", "crate_data")
+load("@rules_rs//rs:rust_library.bzl", "rust_library")
+load("@rules_rs//rs:rust_test.bzl", "rust_test")
+
+rust_library(
+    name = "clnr-tui",
+    srcs = glob(["src/**/*.rs"]),
+    lint_config = crate_data().get("lint_config"),
+    rustc_env_files = ["//:cargo_env"],
+    visibility = ["//visibility:public"],
+    deps = all_crate_deps(normal = True),
+)
+
+rust_test(
+    name = "clnr-tui-test",
+    size = "small",
+    crate = ":clnr-tui",
+    lint_config = crate_data().get("lint_config"),
+    rustc_env_files = ["//:cargo_env"],
+    visibility = ["//:__pkg__"],
+    deps = all_crate_deps(normal_dev = True),
+)

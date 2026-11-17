@@ -1,0 +1,33 @@
+# Hermetic toolchains only: skip probing the machine for a C/C++ compiler or Xcode.
+common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+common --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
+
+# Reuse action outputs across checkouts, worktrees, and `bazel clean`, within a bounded size.
+common --disk_cache=~/.cache/bazel-disk-cache
+common --experimental_disk_cache_gc_max_size=20G
+common --nobuild_runfile_links
+
+# cc-rs build scripts can't drive llvm-libtool-darwin.
+common --@rules_cc//cc/toolchains/args/archiver_flags:use_libtool_on_macos=False
+
+common --test_output=errors
+
+# `--config=lint` runs clippy (with Cargo.toml's lint levels) and rustfmt on every Rust target; `bazel test` always does.
+build:lint --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect,@rules_rust//rust:defs.bzl%rustfmt_aspect
+build:lint --output_groups=+clippy_checks,+rustfmt_checks
+test --config=lint
+common --@rules_rust//rust/settings:clippy_flag=-Dwarnings
+
+# Release binaries: optimized, as Cargo's release profile.
+build:release --compilation_mode=opt
+
+common:ci --color=yes
+common:ci --curses=no
+common:ci --keep_going
+common:ci --lockfile_mode=error
+common:ci --verbose_failures
+# CI runners are short-lived: collect garbage as soon as the build goes idle.
+common:ci --experimental_disk_cache_gc_idle_delay=0
+common:ci --experimental_disk_cache_gc_max_size=4G
+
+try-import %workspace%/user.bazelrc

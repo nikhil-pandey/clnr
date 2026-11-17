@@ -1,0 +1,22 @@
+load("@crates//clnr-providers:data.bzl", "all_crate_deps", "crate_data")
+load("@rules_rs//rs:rust_library.bzl", "rust_library")
+load("@rules_rs//rs:rust_test.bzl", "rust_test")
+
+rust_library(
+    name = "clnr-providers",
+    srcs = glob(["src/**/*.rs"]),
+    lint_config = crate_data().get("lint_config"),
+    rustc_env_files = ["//:cargo_env"],
+    visibility = ["//visibility:public"],
+    deps = all_crate_deps(normal = True),
+)
+
+rust_test(
+    name = "clnr-providers-test",
+    size = "small",
+    crate = ":clnr-providers",
+    lint_config = crate_data().get("lint_config"),
+    rustc_env_files = ["//:cargo_env"],
+    visibility = ["//:__pkg__"],
+    deps = all_crate_deps(normal_dev = True),
+)

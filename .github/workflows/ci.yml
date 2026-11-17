@@ -1,0 +1,91 @@
+name: CI
+
+# Pull requests and main run Bazel on Linux: tests, clippy, and rustfmt on every Rust target, and a read-only smoke
+# run. Linux also cross-builds and lints everything for macOS; the macOS runner runs that build's tests and smoke run
+# without a toolchain of its own. GitHub scopes caches saved by a pull request to that pull request, so only main's are
+# shared, and pull requests only restore them.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  bazel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@f34d6a05eae3c24acab7fa54587492daeaeffdab # 0.19.2
+        with:
+          bazelisk-cache: true
+          disk-cache: test
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
+      - run: bazel test --config=ci //...
+      # Read-only: shows what this runner has.
+      - name: Smoke test
+        run: |
+          bazel run --config=ci //:clnr -- providers --root "$RUNNER_TEMP"
+          bazel run --config=ci //:clnr -- list --root "$RUNNER_TEMP"
+          bazel run --config=ci //:clnr -- config check
+
+  cross:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@f34d6a05eae3c24acab7fa54587492daeaeffdab # 0.19.2
+        with:
+          bazelisk-cache: true
+          disk-cache: cross-macos
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
+      - run: >-
+          bazel build --config=ci --config=lint --platforms=@rules_rs//rs/platforms:aarch64-apple-darwin
+          //... //:rust-test-bundle
+      - run: |
+          mkdir out
+          cp bazel-bin/rust-test-bundle.tar.gz bazel-bin/crates/clnr/clnr out/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos
+          path: out/
+          retention-days: 3
+
+  macos:
+    needs: cross
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: macos
+      # Each test runs from its runfiles tree, as `bazel test` would run it, with an empty HOME.
+      - name: Test
+        run: |
+          mkdir -p tests "$RUNNER_TEMP/home" && tar -xzf rust-test-bundle.tar.gz -C tests && cd tests
+          failed=()
+          for runfiles in *.runfiles; do
+            test=${runfiles%.runfiles}
+            echo "::group::$test"
+            (cd "$runfiles/_main" && env -i HOME="$RUNNER_TEMP/home" PATH=/usr/bin:/bin "../../$test") || failed+=("$test")
+            echo "::endgroup::"
+          done
+          if ((${#failed[@]})); then echo "::error::Failed: ${failed[*]}"; exit 1; fi
+      # Read-only: shows what this runner has, including Xcode's caches.
+      - name: Smoke test
+        run: |
+          chmod +x clnr
+          ./clnr providers --root "$RUNNER_TEMP"
+          ./clnr list --root "$RUNNER_TEMP"
+          ./clnr config check

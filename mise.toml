@@ -1,0 +1,15 @@
+[tasks.build]
+description = "Build everything with Bazel"
+run = "bazel build //..."
+
+[tasks.lint]
+description = "clippy + rustfmt via Bazel, and cargo check for the Cargo side"
+run = ["bazel build //... --config=lint", "cargo clippy --workspace --all-targets --locked -- -D warnings"]
+
+[tasks.check]
+description = "Local gate before committing: Bazel tests with clippy + rustfmt, and Cargo clippy"
+run = ["bazel test //...", "cargo clippy --workspace --all-targets --locked -- -D warnings"]
+
+[tasks.dev]
+description = "Run clnr from source"
+run = "cargo run -q -p clnr --"

@@ -1,0 +1,38 @@
+# clnr configuration. Every setting is optional; delete what you don't need.
+# Check this file with `clnr config check`, and see the effective settings with `clnr config show`.
+
+# Where to look for project build output. Replaces the defaults (~/code and /workspace).
+# Missing directories are skipped.
+# roots = ["~/code", "/workspace"]
+
+# Never walked. Glob patterns or plain paths; a plain path also excludes everything below it.
+# exclude = ["~/code/archive", "**/vendor"]
+
+# Never deleted, nor anything inside or containing them.
+# protect = ["~/code/important/target"]
+
+# Turn a provider off.
+# [providers.python]
+# enabled = false
+
+# Turn off one rule, or make one stricter (safety can only go up:
+# regenerable < redownload < caution). Rule ids are listed by `clnr list --json`.
+# [providers.node.rules.node_modules]
+# enabled = false
+#
+# [providers.cargo.rules.registry-cache]
+# safety = "caution"
+
+# Add a tool. Global locations must list `verify` entries that only that cache contains, so a
+# typo can never make an unrelated directory deletable.
+# [[provider]]
+# id = "elixir"
+# name = "Elixir"
+# tools = ["mix"]
+# global = [
+#   { path = "~/.hex/packages", label = "hex packages", safety = "redownload", verify = ["hexpm"] },
+# ]
+# project = [
+#   # marker: { file = "..." }, { any_file = [...] }, { suffix = [".ext"] }, or "always" (needs verify)
+#   { dir = "_build", marker = { file = "mix.exs" }, verify = ["dev", "test", "prod"], safety = "regenerable" },
+# ]
